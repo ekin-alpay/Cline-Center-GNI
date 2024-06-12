@@ -1,0 +1,39 @@
+---
+title: "GNI"
+output: html_document
+date: "2024-06-12"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+
+##Set the working directory
+#setwd("~/GitHub/Cline-Center-GNI")
+
+#packages
+library(readr)
+
+# Read a .tsv file using read_tsv
+data1 <- read_tsv("06122024_141930.ZMFfEJSj.tsv.part")
+
+
+
+```
+
+
+```{r cars}
+
+
+
+```
+
+
+
+```{r pressure, echo=FALSE}
+
+
+
+```
+
+
