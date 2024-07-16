@@ -9,28 +9,146 @@ knitr::opts_chunk$set(echo = TRUE)
 
 
 ##Set the working directory
-#setwd("~/GitHub/Cline-Center-GNI")
+setwd("~/GitHub/Cline-Center-GNI")
 
 #packages
 library(readr)
+library(dplyr)
+library(stringr)
+library(ggplot2)
+library(tidyr)
 
 # Read a .tsv file using read_tsv
-data1 <- read_tsv("06122024_141930.ZMFfEJSj.tsv.part")
+data1 <- read_tsv("07082024_153154.tsv")
 
+##This data1 is for the Capitol Attack Query using only LexisNexis source 
 
 
 ```
 
+In this chunk I look at some data summaries. These summaries give me an idea about how to clean the data. For example, there are various institutions among the publishers. I will discard those that are based outside of the Us, and think about the International press that might not be accessible for the US based readers as much. 
+
+Similarly I look at the summaries of country variable to see how many country names were extracted from the articles. This helps me see how many of the articles might be related to a different country at the same time and gives me an idea about how to clean the data. For example, in a larger data set, I can discard all those articles that mention a different country than the US. 
 
 ```{r cars}
 
+##A quick look into the data to see what we have in here
+
+#This shows how many articles are here from each publisher:
+publisher_summary <- data1 %>%
+  group_by(publisher) %>%
+  summarize(article_count = n()) %>%
+  arrange(desc(article_count))
+
+# Number of different publishers
+num_publishers <- n_distinct(data1$publisher)
+
+#Analyze countries
+country_summary <- data1 %>%
+  group_by(country) %>%
+  summarize(count = n()) %>%
+  arrange(desc(count))
+
+#Number of distinct countries
+num_countries <- n_distinct(data1$country)
+
+# Display the results
+print(country_summary)
+print(paste("Number of distinct countries:", num_countries))
+
+
+# I want to see how many articles I would have left after cleaning the data from some potentially unrelated publications;
+
+filtered_data1 <- data1 %>%
+  filter(country == "United States")
+
+# Display the first few rows of the filtered data set
+head(filtered_data1)
+
+```
+
+As can be seen, I lost a lot of data points when I filtered the data according to the country names bu we will go from here.Also note that further filtering will be needed for the publisher names as well, because there are international publishers here. 
+
+Let's look at the names and organizations extracted from the articles. Also as seen in the data, some names are coded in several different way to account for that I create a name map to apply to data so I can add up the counts for each name properly.
+
+```{r cars}
+
+# Create a mapping of name variations to a common name
+name_mapping <- list(
+  "Donald Trump" = c("Donald Trump", "President Trump", "Donald J Trump", "Trump"),
+  "Joe Biden" = c("Joe Biden", "President Biden", "Biden","Joseph R. Biden Jr."),
+  "Ted Cruz" = c("Cruz", "Ted Cruz"),
+  "Nacy Pelosi" = c("Pelosi", "Nancy Pelosi"),
+  "Mitt Romney" = c("Romney", "Mitt Romney" ),
+  "Mike Pence" = c("Mike Pence", "Pence"),
+  "Kamala Harris" = c("Kamala Harris", "Harris"),
+  "Barack Obama" = c("Barack Obama", "Obama"), 
+  "Mitch McConell" = c("McConnell", "Mitch McConnell")
+  )
+
+# Create a reverse mapping for easier replacement
+reverse_mapping <- unlist(lapply(names(name_mapping), function(common_name) {
+  setNames(rep(common_name, length(name_mapping[[common_name]])), name_mapping[[common_name]])
+}))
+
+# Separate the names into individual rows
+separated_names <- filtered_data1 %>% ##realize here that I am using the filtered data which decreases the mention counts.
+  separate_rows(extracted_people, sep = "\\|") %>%
+  filter(extracted_people != "")
+
+# Replace name variations with the common name
+separated_names$extracted_people <- ifelse(separated_names$extracted_people %in% names(reverse_mapping), 
+                                           reverse_mapping[separated_names$extracted_people], 
+                                           separated_names$extracted_people)
+
+# Count the occurrences of each name
+name_summary <- separated_names %>%
+  group_by(extracted_people) %>%
+  summarize(count = n()) %>%
+  arrange(desc(count))
+
+# Filter the top 50 most mentioned names
+top_50_names <- name_summary %>%
+  slice_max(order_by = count, n = 50)
+
+# Display the final summary
+print(top_50_names)
+
+
+#Create a histogram of the final summarized names using ggplot2 with all names on the x-axis
+ggplot(top_50_names, aes(x = reorder(extracted_people, -count), y = count, fill = extracted_people)) +
+  geom_bar(stat = "identity") +
+  labs(title = "Top 50 Most Mentioned Names (Consolidated)", x = "Names", y = "Count") +
+  theme(
+    axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5),  # Rotate the x-axis labels
+    legend.position = "none",
+    axis.text = element_text(size = 8)  # Adjust text size for better readability
+  ) +
+  scale_fill_viridis_d() +
+  ylim(0, 5000)  # Set the y-axis range
+
+
+#Top 20 names on the histogram:
+ggplot(name_summary %>% slice_max(order_by = count, n = 20), aes(x = reorder(extracted_people, -count), y = count, fill = extracted_people)) +
+  geom_bar(stat = "identity") +
+  labs(title = "Top 20 Most Mentioned Names (Consolidated)", x = "Names", y = "Count") +
+  theme(
+    axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5),  # Rotate the x-axis labels
+    legend.position = "none",
+    axis.text = element_text(size = 8)  # Adjust text size for better readability
+  ) +
+  scale_fill_viridis_d() +
+  ylim(0, 5000)  # Set the y-axis range
+
 
 
 ```
 
-
+Nice! Let's look at the sentimental changes now. This is also the part where the time trends come into play. We will account for the changing sentiments across time and across publishers. it will probably make more sense with a larger data set that has more diversity of publishers from both sides of the political spectrum. 
 
 ```{r pressure, echo=FALSE}
+
+
 
 
 
